@@ -1,4 +1,6 @@
-from sqlalchemy import String, ForeignKey, JSON
+from datetime import datetime
+
+from sqlalchemy import String, ForeignKey, JSON, DateTime, func
 from sqlalchemy.orm import Mapped, DeclarativeBase, mapped_column
 from pydantic import BaseModel as PDBaseModel
 
@@ -60,3 +62,15 @@ class ServiceParameterValue(BaseModel):
 
     def __repr__(self) -> str:
         return f"ServiceParameterValue({self.service_id=}, {self.parameter_id=}, {self.value=})"
+
+
+class ChatSession(BaseModel):
+    __tablename__ = "chat_session"
+
+    session_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    context: Mapped[dict] = mapped_column(JSON, default=lambda: {})
+    messages: Mapped[list[dict]] = mapped_column(JSON, default=lambda: [])
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
