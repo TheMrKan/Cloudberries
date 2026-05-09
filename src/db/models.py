@@ -39,8 +39,12 @@ class Service(BaseModel):
     __tablename__ = "service"
 
     service_id: Mapped[int] = mapped_column(primary_key=True)
-    provider_id: Mapped[str] = mapped_column(ForeignKey("provider.provider_id", ondelete="CASCADE"))
-    type_id: Mapped[str] = mapped_column(ForeignKey("service_type.type_id", ondelete="CASCADE"))
+    provider_id: Mapped[str] = mapped_column(
+        ForeignKey("provider.provider_id", ondelete="CASCADE")
+    )
+    type_id: Mapped[str] = mapped_column(
+        ForeignKey("service_type.type_id", ondelete="CASCADE")
+    )
     uom: Mapped[str] = mapped_column(String(32))
     price: Mapped[float] = mapped_column()
 
@@ -48,7 +52,11 @@ class Service(BaseModel):
 class ServiceParameterValue(BaseModel):
     __tablename__ = "service_parameter_value"
 
-    service_id: Mapped[int] = mapped_column(ForeignKey("service.service_id", ondelete="CASCADE"), primary_key=True)
+    service_id: Mapped[int] = mapped_column(
+        ForeignKey("service.service_id", ondelete="CASCADE"), primary_key=True
+    )
     parameter_id: Mapped[str] = mapped_column(String(32), primary_key=True)
     value: Mapped[float] = mapped_column()
 
+    def __repr__(self) -> str:
+        return f"ServiceParameterValue({self.service_id=}, {self.parameter_id=}, {self.value=})"

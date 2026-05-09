@@ -1,0 +1,12 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: cloudberries
+      POSTGRES_USER: cloudberries
+      POSTGRES_PASSWORD: cloudberries
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+
