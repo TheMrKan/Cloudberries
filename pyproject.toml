@@ -11,4 +11,5 @@ dependencies = [
     "alembic>=1.14.0",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.7.0",
+    "sqladmin>=0.25.0",
 ]
