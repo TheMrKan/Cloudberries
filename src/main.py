@@ -6,19 +6,19 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from sqladmin import Admin
 
-from src.admin import (
-    AdminAuth,
-    ProviderAdmin,
-    ServiceAdmin,
-    ServiceTypeAdmin,
-    ServiceParameterValueAdmin,
-)
+from src.admin import AdminAuth, ProviderAdmin, ServiceAdmin
 from src.chat.router import router as chat_router
 from src.db.engine import engine
+from src.search.qdrant_client import get_qdrant_client, ensure_collection
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    try:
+        qc = get_qdrant_client()
+        ensure_collection(qc)
+    except Exception:
+        pass
     yield
 
 
@@ -53,6 +53,4 @@ auth_backend = AdminAuth(secret_key="dev-secret-key-change-in-prod")
 
 admin = Admin(app, engine, authentication_backend=auth_backend)
 admin.add_view(ProviderAdmin)
-admin.add_view(ServiceTypeAdmin)
 admin.add_view(ServiceAdmin)
-admin.add_view(ServiceParameterValueAdmin)

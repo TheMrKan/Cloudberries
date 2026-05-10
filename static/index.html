@@ -62,7 +62,7 @@ function addMessage(role, text, events) {
     const evDiv = document.createElement('div');
     evDiv.id = 'services';
     events.forEach(s => {
-      evDiv.innerHTML += `<div class="service-card"><span class="provider">${s.provider || ''}</span> — ${s.name || s.service || ''} <span class="price">${s.price || ''} ${s.uom || ''}</span></div>`;
+      evDiv.innerHTML += `<div class="service-card"><span class="provider">${s.provider_name || ''}</span> — ${s.name || ''}<br><span class="price">${(s.pricing_elements || []).map(e => `${e.price} ${e.uom}`).join(', ')}</span></div>`;
     });
     el.appendChild(evDiv);
   }

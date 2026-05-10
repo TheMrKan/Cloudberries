@@ -1,9 +1,12 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import StreamingResponse
 
 from src.chat.schemas import ChatInitResponse, ChatSendRequest, MessageOut
 from src.chat.service import ChatService
+from src.chat_engine import chat_pipeline
 from src.db.engine import get_session
 
 router = APIRouter(prefix="/chat")
@@ -24,9 +27,7 @@ async def send_message(body: ChatSendRequest, db: AsyncSession = Depends(get_ses
     await ChatService.append_message(db, body.session_id, "user", body.message)
 
     async def event_stream():
-        async for event in ChatService.process_message(
-            db, body.session_id, body.message
-        ):
+        async for event in chat_pipeline(db, body.session_id, body.message):
             yield f"data: {event}\n\n"
         yield "event: done\ndata: null\n\n"
 

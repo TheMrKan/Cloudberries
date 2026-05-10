@@ -2,7 +2,7 @@ from sqladmin import ModelView
 from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
 
-from src.db.models import Provider, ServiceType, Service, ServiceParameterValue
+from src.db.models import Provider, Service
 
 
 class AdminAuth(AuthenticationBackend):
@@ -27,37 +27,21 @@ class ProviderAdmin(ModelView, model=Provider):
     form_columns = [Provider.provider_id, Provider.name]
 
 
-class ServiceTypeAdmin(ModelView, model=ServiceType):
-    column_list = [ServiceType.type_id, ServiceType.name, ServiceType.description]
-    column_searchable_list = [ServiceType.name]
-    form_columns = [
-        ServiceType.type_id,
-        ServiceType.name,
-        ServiceType.description,
-        ServiceType.parameters,
-    ]
-
-
 class ServiceAdmin(ModelView, model=Service):
     column_list = [
         Service.service_id,
         Service.provider_id,
-        Service.type_id,
-        Service.uom,
-        Service.price,
+        Service.name,
+        Service.compliance_tags,
+        Service.regions,
+        Service.pricing_elements,
     ]
-    column_searchable_list = [Service.uom]
-    form_columns = [Service.provider_id, Service.type_id, Service.uom, Service.price]
-
-
-class ServiceParameterValueAdmin(ModelView, model=ServiceParameterValue):
-    column_list = [
-        ServiceParameterValue.service_id,
-        ServiceParameterValue.parameter_id,
-        ServiceParameterValue.value,
-    ]
+    column_searchable_list = [Service.name]
     form_columns = [
-        ServiceParameterValue.service_id,
-        ServiceParameterValue.parameter_id,
-        ServiceParameterValue.value,
+        Service.provider_id,
+        Service.name,
+        Service.description,
+        Service.compliance_tags,
+        Service.regions,
+        Service.pricing_elements,
     ]

@@ -13,55 +13,35 @@ class Provider(BaseModel):
     __tablename__ = "provider"
 
     provider_id: Mapped[str] = mapped_column(String(32), primary_key=True)
-    name: Mapped[str] = mapped_column(String(32))
+    name: Mapped[str] = mapped_column(String(128))
 
     def __repr__(self) -> str:
         return f"Provider({self.provider_id=}, {self.name=})"
 
 
-class ServiceParameter(PDBaseModel):
-    id: str
-    name: str
+class PricingElement(PDBaseModel):
+    description: str
     uom: str
-
-
-class ServiceType(BaseModel):
-    __tablename__ = "service_type"
-
-    type_id: Mapped[str] = mapped_column(String(32), primary_key=True)
-    name: Mapped[str] = mapped_column(String(64))
-    description: Mapped[str] = mapped_column(String(512))
-    parameters: Mapped[dict[str, ServiceParameter]] = mapped_column(JSON())
-
-    def __repr__(self) -> str:
-        return f"ServiceType({self.type_id=}, {self.name=}, {self.description[:20]=})"
+    price: float
 
 
 class Service(BaseModel):
     __tablename__ = "service"
 
-    service_id: Mapped[int] = mapped_column(primary_key=True)
+    service_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     provider_id: Mapped[str] = mapped_column(
         ForeignKey("provider.provider_id", ondelete="CASCADE")
     )
-    type_id: Mapped[str] = mapped_column(
-        ForeignKey("service_type.type_id", ondelete="CASCADE")
+    name: Mapped[str] = mapped_column(String(256))
+    description: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    compliance_tags: Mapped[list[str] | None] = mapped_column(
+        JSON, nullable=True, default=list
     )
-    uom: Mapped[str] = mapped_column(String(32))
-    price: Mapped[float] = mapped_column()
-
-
-class ServiceParameterValue(BaseModel):
-    __tablename__ = "service_parameter_value"
-
-    service_id: Mapped[int] = mapped_column(
-        ForeignKey("service.service_id", ondelete="CASCADE"), primary_key=True
+    regions: Mapped[list[str] | None] = mapped_column(JSON, nullable=True, default=list)
+    pricing_elements: Mapped[list[dict] | None] = mapped_column(
+        JSON, nullable=True, default=list
     )
-    parameter_id: Mapped[str] = mapped_column(String(32), primary_key=True)
-    value: Mapped[float] = mapped_column()
-
-    def __repr__(self) -> str:
-        return f"ServiceParameterValue({self.service_id=}, {self.parameter_id=}, {self.value=})"
+    extra_data: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
 
 
 class ChatSession(BaseModel):
