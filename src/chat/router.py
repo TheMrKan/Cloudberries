@@ -24,6 +24,7 @@ async def send_message(body: ChatSendRequest, db: AsyncSession = Depends(get_ses
     if session is None:
         raise HTTPException(404, "Session not found")
 
+    print(f"[ROUTER] session={body.session_id} message={body.message}")
     await ChatService.append_message(db, body.session_id, "user", body.message)
 
     async def event_stream():

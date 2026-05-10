@@ -49,6 +49,7 @@ def search_vector(
     limit: int = 20,
     filters: dict | None = None,
 ) -> list[dict]:
+    print(f"[QDRANT] search limit={limit} filters={filters}")
     must = []
     if filters:
         if filters.get("compliance"):
@@ -76,6 +77,8 @@ def search_vector(
         with_payload=True,
         with_vectors=False,
     )
+    count = len(response.points)
+    print(f"[QDRANT] returned {count} results")
     return [
         {
             "service_id": r.id,

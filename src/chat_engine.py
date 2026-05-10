@@ -14,7 +14,9 @@ def _make_embedding(text: str) -> list[float]:
 
 
 async def _run_search_tool(structured) -> list[dict]:
-    """Выполняет поисковый пайплайн — это и есть tool."""
+    print(
+        f"[SEARCH] keyword_query={structured.keyword_search_query} vector_query={structured.vector_search_query} compliance={structured.compliance_filter} regions={structured.regions_filter}"
+    )
     all_results = []
 
     if structured.keyword_search_query:
@@ -23,6 +25,7 @@ async def _run_search_tool(structured) -> list[dict]:
             compliance_filter=structured.compliance_filter,
             regions=structured.regions_filter,
         )
+        print(f"[SEARCH] bm25 results={len(kw_results)}")
         all_results.extend(kw_results)
 
     if structured.vector_search_query:
@@ -62,32 +65,47 @@ async def chat_pipeline(
 
     history = session.messages
 
+    print(f"[ENGINE] history_len={len(history)} text={text}")
+
     # Шаг 1: LLM решает — ответить или вызвать tool
-    decision = llm_complete([*history, {"role": "user", "text": text}])
+    print("[ENGINE] step1: calling llm_complete...")
+    decision = await llm_complete([*history, {"role": "user", "text": text}])
+    print(f"[ENGINE] step1: decision keys={list(decision.keys())}")
 
     if "tool_call" in decision:
         # Шаг 2: шлём событие о вызове тула
         structured = decision["tool_call"]
+        structured_dump = structured.model_dump(exclude_none=True)
+        print(f"[ENGINE] step2: tool_call args={structured_dump}")
         yield json.dumps(
             {
                 "event": "tool_call",
                 "data": {
                     "tool": "search_services",
-                    "arguments": structured.model_dump(exclude_none=True),
+                    "arguments": structured_dump,
                 },
             }
         )
 
         # Шаг 3: выполняем поиск
+        print("[ENGINE] step3: running search...")
         results = await _run_search_tool(structured)
+        print(f"[ENGINE] step3: results count={len(results)}")
 
         yield json.dumps({"event": "services", "data": results})
 
         # Шаг 4: LLM формирует ответ на основе результатов
-        answer = llm_with_results([*history, {"role": "user", "text": text}], results)
+        print("[ENGINE] step4: calling llm_with_results...")
+        answer = await llm_with_results(
+            [*history, {"role": "user", "text": text}],
+            decision["raw_message"],
+            results,
+        )
+        print(f"[ENGINE] step4: answer={answer[:200]}")
 
     else:
         answer = decision.get("content", "")
+        print(f"[ENGINE] else: text answer={answer[:200]}")
 
     yield json.dumps({"event": "message", "data": {"text": answer}})
 

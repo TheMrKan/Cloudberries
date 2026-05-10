@@ -39,10 +39,15 @@ class KeywordSearchEngine:
         regions: list[str] | None = None,
         limit: int = 20,
     ) -> list[dict]:
+        print(
+            f"[BM25] search query={query} compliance={compliance_filter} regions={regions}"
+        )
         if not self._bm25 or not self._services:
+            print(f"[BM25] skip — engine not loaded")
             return []
 
         query_tokens = _tokenize(query)
+        print(f"[BM25] tokens={query_tokens}")
         if not query_tokens:
             return []
 
@@ -77,6 +82,7 @@ class KeywordSearchEngine:
             if len(results) >= limit:
                 break
 
+        print(f"[BM25] returned {len(results)} results")
         return results
 
 
@@ -122,5 +128,6 @@ async def init_keyword_search(db_session):
         for row in rows
     ]
 
+    print(f"[BM25] loaded {len(services)} services into keyword search engine")
     engine = get_engine()
     engine.load(services)
