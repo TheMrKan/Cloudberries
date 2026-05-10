@@ -2,9 +2,10 @@ from pydantic import BaseModel
 
 
 class StructuredSearch(BaseModel):
+    keyword_search_query: str | None = None
+    vector_search_query: str | None = None
     compliance_filter: list[str] | None = None
     regions_filter: list[str] | None = None
-    search_queries: list[str] = []
 
 
 class ChatInitResponse(BaseModel):

@@ -51,27 +51,26 @@ def search_vector(
 ) -> list[dict]:
     must = []
     if filters:
-        conditions = []
         if filters.get("compliance"):
-            conditions.append(
-                models.FieldCondition(
-                    key="compliance",
-                    match=models.MatchAny(any=filters["compliance"]),
+            for tag in filters["compliance"]:
+                must.append(
+                    models.FieldCondition(
+                        key="compliance",
+                        match=models.MatchValue(value=tag),
+                    )
                 )
-            )
         if filters.get("regions"):
-            conditions.append(
-                models.FieldCondition(
-                    key="regions",
-                    match=models.MatchAny(any=filters["regions"]),
+            for region in filters["regions"]:
+                must.append(
+                    models.FieldCondition(
+                        key="regions",
+                        match=models.MatchValue(value=region),
+                    )
                 )
-            )
-        if conditions:
-            must.append(models.Filter(must=conditions))
 
-    results = client.search(
+    response = client.query_points(
         collection_name=COLLECTION_NAME,
-        query_vector=query_vector,
+        query=query_vector,
         query_filter=models.Filter(must=must) if must else None,
         limit=limit,
         with_payload=True,
@@ -83,5 +82,5 @@ def search_vector(
             "score": r.score,
             **r.payload,
         }
-        for r in results
+        for r in response.points
     ]

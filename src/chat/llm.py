@@ -27,11 +27,12 @@ def llm_complete(
     if any(kw in last.lower() for kw in SEARCH_KEYWORDS):
         compliance = []
         if "152-фз" in last.lower() or "152фз" in last.lower():
-            compliance.append("152-FZ")
+            compliance.append("152-ФЗ")
         structured = StructuredSearch(
+            keyword_search_query=last,
+            vector_search_query=last,
             compliance_filter=compliance or None,
             regions_filter=None,
-            search_queries=[last],
         )
         return {"role": "assistant", "tool_call": structured}
 

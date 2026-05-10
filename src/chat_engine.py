@@ -5,41 +5,49 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.chat.llm import llm_complete, llm_with_results
 from src.chat.service import ChatService
-from src.search.bm25 import bm25_search
+from src.search.keyword_search import get_engine as get_keyword_engine
 from src.search.qdrant_client import get_qdrant_client, search_vector
-from src.search.hybrid import hybrid_rerank
 
 
 def _make_embedding(text: str) -> list[float]:
     return [0.0] * 384
 
 
-async def _run_search_tool(db: AsyncSession, structured) -> list[dict]:
+async def _run_search_tool(structured) -> list[dict]:
     """Выполняет поисковый пайплайн — это и есть tool."""
-    bm25_results = await bm25_search(
-        db,
-        keywords=structured.search_queries,
-        compliance_filter=structured.compliance_filter,
-        regions=structured.regions_filter,
-    )
+    all_results = []
 
-    qdrant = get_qdrant_client()
-    vec = _make_embedding(" ".join(structured.search_queries))
-    qdrant_filters = {}
-    if structured.compliance_filter:
-        qdrant_filters["compliance"] = structured.compliance_filter
-    if structured.regions_filter:
-        qdrant_filters["regions"] = structured.regions_filter
+    if structured.keyword_search_query:
+        kw_results = get_keyword_engine().search(
+            query=structured.keyword_search_query,
+            compliance_filter=structured.compliance_filter,
+            regions=structured.regions_filter,
+        )
+        all_results.extend(kw_results)
 
-    vector_results = search_vector(
-        qdrant,
-        query_vector=vec,
-        limit=20,
-        filters=qdrant_filters,
-    )
+    if structured.vector_search_query:
+        qdrant = get_qdrant_client()
+        vec = _make_embedding(structured.vector_search_query)
+        qdrant_filters = {}
+        if structured.compliance_filter:
+            qdrant_filters["compliance"] = structured.compliance_filter
+        if structured.regions_filter:
+            qdrant_filters["regions"] = structured.regions_filter
 
-    ranked = hybrid_rerank(vector_results, bm25_results)
-    return ranked[:10]
+        vec_results = search_vector(
+            qdrant,
+            query_vector=vec,
+            limit=20,
+            filters=qdrant_filters,
+        )
+
+        seen = {r["service_id"] for r in all_results}
+        for r in vec_results:
+            if r["service_id"] not in seen:
+                all_results.append(r)
+                seen.add(r["service_id"])
+
+    return all_results[:10]
 
 
 async def chat_pipeline(
@@ -71,7 +79,7 @@ async def chat_pipeline(
         )
 
         # Шаг 3: выполняем поиск
-        results = await _run_search_tool(db, structured)
+        results = await _run_search_tool(structured)
 
         yield json.dumps({"event": "services", "data": results})
 

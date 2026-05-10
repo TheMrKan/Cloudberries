@@ -37,6 +37,9 @@ class Service(BaseModel):
     compliance_tags: Mapped[list[str] | None] = mapped_column(
         JSON, nullable=True, default=list
     )
+    keywords: Mapped[list[str] | None] = mapped_column(
+        JSON, nullable=True, default=list
+    )
     regions: Mapped[list[str] | None] = mapped_column(JSON, nullable=True, default=list)
     pricing_elements: Mapped[list[dict] | None] = mapped_column(
         JSON, nullable=True, default=list

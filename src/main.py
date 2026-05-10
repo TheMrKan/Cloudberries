@@ -8,8 +8,9 @@ from sqladmin import Admin
 
 from src.admin import AdminAuth, ProviderAdmin, ServiceAdmin
 from src.chat.router import router as chat_router
-from src.db.engine import engine
+from src.db.engine import async_session_factory, engine
 from src.db.models import BaseModel
+from src.search.keyword_search import init_keyword_search
 from src.search.qdrant_client import get_qdrant_client, ensure_collection
 
 
@@ -22,6 +23,8 @@ async def lifespan(app: FastAPI):
         ensure_collection(qc)
     except Exception:
         pass
+    async with async_session_factory() as session:
+        await init_keyword_search(session)
     yield
 
 
