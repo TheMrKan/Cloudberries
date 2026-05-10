@@ -52,11 +52,11 @@ def search_vector(
     must = []
     if filters:
         conditions = []
-        if filters.get("fz_filter"):
+        if filters.get("compliance"):
             conditions.append(
                 models.FieldCondition(
-                    key="compliance_152fz",
-                    match=models.MatchValue(value=True),
+                    key="compliance",
+                    match=models.MatchAny(any=filters["compliance"]),
                 )
             )
         if filters.get("regions"):

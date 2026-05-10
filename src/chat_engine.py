@@ -19,15 +19,15 @@ async def _run_search_tool(db: AsyncSession, structured) -> list[dict]:
     bm25_results = await bm25_search(
         db,
         keywords=structured.search_queries,
-        fz_filter=structured.fz_filter,
+        compliance_filter=structured.compliance_filter,
         regions=structured.regions_filter,
     )
 
     qdrant = get_qdrant_client()
     vec = _make_embedding(" ".join(structured.search_queries))
     qdrant_filters = {}
-    if structured.fz_filter:
-        qdrant_filters["fz_filter"] = True
+    if structured.compliance_filter:
+        qdrant_filters["compliance"] = structured.compliance_filter
     if structured.regions_filter:
         qdrant_filters["regions"] = structured.regions_filter
 

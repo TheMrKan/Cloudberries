@@ -7,7 +7,7 @@ from src.db.models import Service, Provider
 async def bm25_search(
     db: AsyncSession,
     keywords: list[str],
-    fz_filter: bool | None = None,
+    compliance_filter: list[str] | None = None,
     regions: list[str] | None = None,
 ) -> list[dict]:
     if not keywords:
@@ -42,8 +42,8 @@ async def bm25_search(
         .where(or_(*ilike_conditions))
     )
 
-    if fz_filter:
-        stmt = stmt.where(Service.compliance_tags.contains(["152-FZ"]))
+    if compliance_filter:
+        stmt = stmt.where(Service.compliance_tags.has_any(compliance_filter))
 
     if regions:
         stmt = stmt.where(Service.regions.has_any(regions))

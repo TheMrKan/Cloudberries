@@ -25,8 +25,11 @@ def llm_complete(
     last = messages[-1]["text"] if messages else ""
 
     if any(kw in last.lower() for kw in SEARCH_KEYWORDS):
+        compliance = []
+        if "152-фз" in last.lower() or "152фз" in last.lower():
+            compliance.append("152-FZ")
         structured = StructuredSearch(
-            fz_filter="152-фз" in last.lower() or "152фз" in last.lower(),
+            compliance_filter=compliance or None,
             regions_filter=None,
             search_queries=[last],
         )

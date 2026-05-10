@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 
 class StructuredSearch(BaseModel):
-    fz_filter: bool | None = None
+    compliance_filter: list[str] | None = None
     regions_filter: list[str] | None = None
     search_queries: list[str] = []
 

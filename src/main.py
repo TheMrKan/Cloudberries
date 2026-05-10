@@ -9,11 +9,14 @@ from sqladmin import Admin
 from src.admin import AdminAuth, ProviderAdmin, ServiceAdmin
 from src.chat.router import router as chat_router
 from src.db.engine import engine
+from src.db.models import BaseModel
 from src.search.qdrant_client import get_qdrant_client, ensure_collection
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    async with engine.begin() as conn:
+        await conn.run_sync(BaseModel.metadata.create_all)
     try:
         qc = get_qdrant_client()
         ensure_collection(qc)
