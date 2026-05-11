@@ -5,27 +5,12 @@ import { Textarea } from "./components/ui/textarea";
 import { Card } from "./components/ui/card";
 import { Badge } from "./components/ui/badge";
 import { Skeleton } from "./components/ui/skeleton";
-
-// ---------- Types ----------
-interface ServiceItem {
-  id: string;
-  name: string;
-  provider: string;
-  tags: string[];
-  description: string;
-  url: string;
-  fz152: boolean;
-  platform?: string;
-  region: string;
-}
-
-interface ServiceResult extends ServiceItem {
-  rationale: string;
-  priceScore: number;
-  taskMatchScore: number;
-  criteriaMatchScore: number;
-  pricing_elements: Array<{ description: string; uom: string; price: number }>;
-}
+import {
+  getSessionId,
+  fetchServices,
+  sendChatMessage,
+} from "./api";
+import type { FrontendServiceItem as ServiceItem, FrontendServiceResult as ServiceResult } from "./api";
 
 type Phase = "catalog" | "chat" | "results";
 
@@ -38,10 +23,12 @@ interface HistoryEntry {
 // ---------- Provider assets ----------
 const PROVIDER_LOGOS: Record<string, string> = {
   "Т1 Облако": "https://t1-cloud.ru/favicon.ico",
+  "Т1 Cloud": "https://t1-cloud.ru/favicon.ico",
   "Cloud.ru": "https://www.google.com/s2/favicons?domain=cloud.ru&sz=64",
   "Selectel": "https://selectel.ru/favicon.ico",
   "VK Cloud": "https://www.google.com/s2/favicons?domain=cloud.vk.com&sz=64",
   "Yandex Cloud": "https://yandex.cloud/favicon.ico",
+  "Cloud Provider": "https://www.google.com/s2/favicons?domain=cloud.ru&sz=64",
 };
 
 function ProviderIcon({ provider, size = "md" }: { provider: string; size?: "sm" | "md" }) {
@@ -55,87 +42,7 @@ function ProviderIcon({ provider, size = "md" }: { provider: string; size?: "sm"
   );
 }
 
-// ---------- Mock data ----------
-const ALL_SERVICES: ServiceItem[] = [
-  { id: "1", name: "Compute (Cloud Engine)", provider: "Т1 Облако", tags: ["VPS", "OpenStack", "152-ФЗ"], description: "Облачные ресурсы для создания масштабируемой вычислительной инфраструктуры, администрирования и сопровождения сервисов на платформе OpenStack.", url: "https://t1-cloud.ru/services/compute", fz152: true, platform: "OpenStack", region: "Москва" },
-  { id: "2", name: "Объектное хранилище S3", provider: "Т1 Облако", tags: ["S3", "152-ФЗ", "OpenStack"], description: "S3-совместимое объектное хранилище с мультизональным размещением для файлов, статики, бэкапов и архивов.", url: "https://t1-cloud.ru/services/s3", fz152: true, platform: "OpenStack", region: "Москва" },
-  { id: "3", name: "Managed Kubernetes", provider: "Т1 Облако", tags: ["K8s", "152-ФЗ", "OpenStack"], description: "Управляемый кластер Kubernetes с автоскейлингом и интеграцией в OpenStack.", url: "https://t1-cloud.ru/services/kubernetes", fz152: true, platform: "OpenStack", region: "Москва" },
-  { id: "4", name: "Managed PostgreSQL", provider: "Т1 Облако", tags: ["БД", "PostgreSQL", "152-ФЗ"], description: "DBaaS на базе PostgreSQL с автоматическим бэкапом, репликацией и мониторингом.", url: "https://t1-cloud.ru/services/postgresql", fz152: true, platform: "OpenStack", region: "Москва" },
-  { id: "5", name: "Evolution Object Storage", provider: "Cloud.ru", tags: ["S3", "152-ФЗ", "Multi-AZ"], description: "Масштабируемое S3-хранилище с автоматическим масштабированием, версионированием и AWS S3 API.", url: "https://cloud.ru/services/object-storage", fz152: true, region: "Москва" },
-  { id: "6", name: "Cloud Servers", provider: "VK Cloud", tags: ["VPS", "VMware"], description: "Виртуальные серверы с быстрой сетью и гибкими конфигурациями.", url: "https://cloud.vk.com/services/servers", fz152: false, platform: "VMware", region: "Москва, Санкт-Петербург" },
-  { id: "7", name: "S3-хранилище", provider: "Selectel", tags: ["S3", "холодное хранение"], description: "Объектное хранилище с горячим и холодным классами для бэкапов и архивов.", url: "https://selectel.ru/services/storage/s3/", fz152: false, region: "Москва, Санкт-Петербург" },
-  { id: "8", name: "Compute Cloud", provider: "Yandex Cloud", tags: ["VPS", "посекундная оплата"], description: "Виртуальные машины с посекундной оплатой и интеграцией с сервисами Yandex Cloud.", url: "https://yandex.cloud/ru/services/compute", fz152: false, region: "Москва, Владимирская обл." },
-  { id: "9", name: "Managed Databases", provider: "Yandex Cloud", tags: ["БД", "PostgreSQL", "MySQL"], description: "Управляемые БД PostgreSQL, MySQL, ClickHouse с авто-бэкапом и масштабированием.", url: "https://yandex.cloud/ru/services/managed-postgresql", fz152: false, region: "Москва, Владимирская обл." },
-  { id: "10", name: "Cloud Storage", provider: "VK Cloud", tags: ["S3", "Hotbox", "Icebox"], description: "Объектное хранилище с горячим и холодным классами.", url: "https://cloud.vk.com/services/storage", fz152: false, region: "Москва, Санкт-Петербург" },
-  { id: "11", name: "VPS (Virtual Private Server)", provider: "Selectel", tags: ["VPS", "VMware"], description: "Виртуальные серверы с выделенными ресурсами и быстрым масштабированием.", url: "https://selectel.ru/services/vps/", fz152: false, platform: "VMware", region: "Москва, Санкт-Петербург" },
-  { id: "12", name: "Cloud Servers", provider: "Cloud.ru", tags: ["VPS", "OpenStack", "152-ФЗ"], description: "Виртуальные машины на OpenStack с высокой доступностью и 152-ФЗ.", url: "https://cloud.ru/services/servers", fz152: true, platform: "OpenStack", region: "Москва" },
-];
 
-const MOCK_RESULTS: ServiceResult[] = [
-  { id: "r1", name: "Объектное хранилище S3", provider: "Т1 Облако", tags: ["S3", "152-ФЗ", "OpenStack"], description: "S3-хранилище с мультизональным размещением и интеграцией с OpenStack.", url: "https://t1-cloud.ru/services/s3", fz152: true, platform: "OpenStack", region: "Москва", rationale: "Наиболее выгодное предложение в заданном бюджете (2000 руб/мес). Полное соответствие 152-ФЗ, мультизональный S3 повышает надёжность.", priceScore: 9, taskMatchScore: 9, criteriaMatchScore: 8, pricing_elements: [
-    { description: "Объектное хранилище (S3), хранение данных", uom: "ГБ*мин", price: 0.00003819 },
-    { description: "Объектное хранилище (S3), скачивание данных", uom: "ГБ", price: 0.25 },
-    { description: "Объектное хранилище (S3), запросы Put/Post", uom: "1000 шт", price: 0.24 },
-    { description: "Объектное хранилище (S3), запросы Get/Head", uom: "10 000 шт", price: 0.24 },
-    { description: "Объектное хранилище (мультизональное S3), хранение данных", uom: "ГБ*мин", price: 0.00006906 },
-    { description: "Объектное хранилище (мультизональное S3), скачивание данных", uom: "ГБ", price: 0.50 },
-    { description: "Объектное хранилище (мультизональное S3), запросы Put/Post", uom: "1000 шт", price: 0.24 },
-    { description: "Объектное хранилище (мультизональное S3), запросы Get/Head", uom: "10 000 шт", price: 0.24 },
-  ] },
-  { id: "r2", name: "Evolution Object Storage", provider: "Cloud.ru", tags: ["S3", "152-ФЗ", "Multi-AZ"], description: "S3-хранилище от Cloud.ru с версионированием и совместимостью S3 API.", url: "https://cloud.ru/services/object-storage", fz152: true, region: "Москва", rationale: "Отличная альтернатива с мощным функционалом. Дороже Т1, но предоставляет больше гибкости и глобальную CDN.", priceScore: 8, taskMatchScore: 10, criteriaMatchScore: 9, pricing_elements: [
-    { description: "Evolution Object Storage, хранение", uom: "ГБ", price: 2.5 },
-    { description: "Evolution Object Storage, запросы Put/Post", uom: "1000 шт", price: 0.30 },
-    { description: "Evolution Object Storage, запросы Get/Head", uom: "10 000 шт", price: 0.20 },
-    { description: "Evolution Object Storage, исходящий трафик", uom: "ГБ", price: 1.0 },
-  ] },
-  { id: "r3", name: "Cloud Storage", provider: "VK Cloud", tags: ["S3", "Hotbox", "Icebox"], description: "Объектное хранилище VK Cloud с горячим и холодным классами.", url: "https://cloud.vk.com/services/storage", fz152: false, region: "Москва, Санкт-Петербург", rationale: "Самое бюджетное решение при больших объёмах. Без официального статуса 152-ФЗ.", priceScore: 10, taskMatchScore: 7, criteriaMatchScore: 6, pricing_elements: [
-    { description: "Cloud Storage (Hotbox), хранение", uom: "ГБ", price: 1.8 },
-    { description: "Cloud Storage (Icebox), хранение", uom: "ГБ", price: 0.9 },
-    { description: "Cloud Storage, запросы Put/Post", uom: "1000 шт", price: 0.20 },
-    { description: "Cloud Storage, запросы Get/Head", uom: "10 000 шт", price: 0.15 },
-    { description: "Cloud Storage, исходящий трафик", uom: "ГБ", price: 0.80 },
-  ] },
-];
-
-const MOCK_RESULTS_2: ServiceResult[] = [
-  { id: "r4", name: "Managed Kubernetes", provider: "Т1 Облако", tags: ["K8s", "152-ФЗ", "OpenStack"], description: "Управляемый кластер Kubernetes с автоскейлингом и интеграцией в OpenStack.", url: "https://t1-cloud.ru/services/kubernetes", fz152: true, platform: "OpenStack", region: "Москва", rationale: "Лучшее решение для контейнеризации в Москве. Полное соответствие 152-ФЗ, интеграция с OpenStack.", priceScore: 8, taskMatchScore: 9, criteriaMatchScore: 8, pricing_elements: [
-    { description: "Kubernetes, мастер-узел", uom: "час", price: 12 },
-    { description: "Kubernetes, рабочий узел", uom: "час", price: 3.5 },
-    { description: "Kubernetes, нагрузочный балансировщик", uom: "час", price: 1.2 },
-    { description: "Kubernetes, хранение данных", uom: "ГБ", price: 2 },
-  ] },
-  { id: "r5", name: "Managed PostgreSQL", provider: "Т1 Облако", tags: ["БД", "PostgreSQL", "152-ФЗ"], description: "DBaaS на базе PostgreSQL с автоматическим бэкапом, репликацией и мониторингом.", url: "https://t1-cloud.ru/services/postgresql", fz152: true, platform: "OpenStack", region: "Москва", rationale: "Надёжная управляемая БД с полным соответствием 152-ФЗ и автоматическим резервным копированием.", priceScore: 7, taskMatchScore: 8, criteriaMatchScore: 9, pricing_elements: [
-    { description: "PostgreSQL, 1 vCPU + 2 ГБ RAM", uom: "час", price: 2.5 },
-    { description: "PostgreSQL, хранилище SSD", uom: "ГБ", price: 5 },
-    { description: "PostgreSQL, резервные копии", uom: "ГБ", price: 1 },
-  ] },
-  { id: "r6", name: "Cloud Servers", provider: "Cloud.ru", tags: ["VPS", "OpenStack", "152-ФЗ"], description: "Виртуальные машины на OpenStack с высокой доступностью и 152-ФЗ.", url: "https://cloud.ru/services/servers", fz152: true, platform: "OpenStack", region: "Москва", rationale: "Гибкие виртуальные серверы с посекундной оплатой и соответствием 152-ФЗ.", priceScore: 8, taskMatchScore: 7, criteriaMatchScore: 8, pricing_elements: [
-    { description: "Cloud Servers, 1 vCPU + 1 ГБ RAM", uom: "час", price: 1.5 },
-    { description: "Cloud Servers, 2 vCPU + 4 ГБ RAM", uom: "час", price: 3.8 },
-    { description: "Cloud Servers, SSD диск", uom: "ГБ", price: 4 },
-    { description: "Cloud Servers, бэкапы", uom: "ГБ", price: 0.5 },
-  ] },
-];
-
-const MOCK_RESULTS_3: ServiceResult[] = [
-  { id: "r7", name: "Compute (Cloud Engine)", provider: "Т1 Облако", tags: ["VPS", "OpenStack", "152-ФЗ"], description: "Облачные ресурсы для создания масштабируемой вычислительной инфраструктуры на платформе OpenStack.", url: "https://t1-cloud.ru/services/compute", fz152: true, platform: "OpenStack", region: "Москва", rationale: "Мощная вычислительная платформа с широкими возможностями кастомизации и полным комплаенсом.", priceScore: 7, taskMatchScore: 8, criteriaMatchScore: 7, pricing_elements: [
-    { description: "Compute, 1 vCPU + 2 ГБ RAM", uom: "час", price: 1.8 },
-    { description: "Compute, 4 vCPU + 8 ГБ RAM", uom: "час", price: 5.2 },
-    { description: "Compute, SSD диск", uom: "ГБ", price: 3 },
-  ] },
-  { id: "r8", name: "VPS (Virtual Private Server)", provider: "Selectel", tags: ["VPS", "VMware"], description: "Виртуальные серверы с выделенными ресурсами и быстрым масштабированием.", url: "https://selectel.ru/services/vps/", fz152: false, platform: "VMware", region: "Москва, Санкт-Петербург", rationale: "Доступные виртуальные серверы с быстрой сетью и гибкой конфигурацией без 152-ФЗ.", priceScore: 9, taskMatchScore: 6, criteriaMatchScore: 5, pricing_elements: [
-    { description: "VPS, 1 vCPU + 1 ГБ RAM", uom: "месяц", price: 350 },
-    { description: "VPS, 2 vCPU + 4 ГБ RAM", uom: "месяц", price: 750 },
-    { description: "VPS, SSD диск", uom: "ГБ", price: 2.5 },
-  ] },
-  { id: "r9", name: "Managed Databases", provider: "Yandex Cloud", tags: ["БД", "PostgreSQL", "MySQL"], description: "Управляемые БД PostgreSQL, MySQL, ClickHouse с авто-бэкапом и масштабированием.", url: "https://yandex.cloud/ru/services/managed-postgresql", fz152: false, region: "Москва, Владимирская обл.", rationale: "Широкий выбор СУБД с автоматическим масштабированием. Без 152-ФЗ, но с высокой отказоустойчивостью.", priceScore: 8, taskMatchScore: 8, criteriaMatchScore: 7, pricing_elements: [
-    { description: "PostgreSQL, 1 vCPU + 2 ГБ RAM", uom: "час", price: 2.2 },
-    { description: "PostgreSQL, SSD диск", uom: "ГБ", price: 3.5 },
-    { description: "PostgreSQL, бэкапы", uom: "ГБ", price: 0.8 },
-  ] },
-];
-
-const MOCK_SETS = [MOCK_RESULTS, MOCK_RESULTS_2, MOCK_RESULTS_3];
 
 // ---------- Score bar ----------
 function ScoreBar({ label, value }: { label: string; value: number }) {
@@ -302,17 +209,18 @@ export default function App() {
     if (stored) return stored === "dark";
     return window.matchMedia("(prefers-color-scheme: dark)").matches;
   });
-  const [awaitingClarification, setAwaitingClarification] = useState(false);
   const [selectedResultIdx, setSelectedResultIdx] = useState(0);
   const [showSearchHistory, setShowSearchHistory] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isNewSearch, setIsNewSearch] = useState(false);
+  const botTextRef = useRef("");
+  const [streamingText, setStreamingText] = useState("");
   const chatRef = useRef<HTMLDivElement>(null);
-  const loadingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [splitRatio, setSplitRatio] = useState(0.6);
   const isDragging = useRef(false);
   const splitContainerRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -325,127 +233,106 @@ export default function App() {
     if (chatRef.current) chatRef.current.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
-  useEffect(() => {
-    return () => { if (loadingTimeout.current) clearTimeout(loadingTimeout.current); };
-  }, []);
-
-  function pickCatalog() {
-    setCatalogServices([...ALL_SERVICES].sort(() => 0.5 - Math.random()).slice(0, 9));
+  async function pickCatalog() {
+    try {
+      const all = await fetchServices();
+      const shuffled = [...all].sort(() => 0.5 - Math.random());
+      setCatalogServices(shuffled.slice(0, 9));
+    } catch {
+      setCatalogServices([]);
+    }
   }
 
   function goToCatalog() {
-    if (loadingTimeout.current) clearTimeout(loadingTimeout.current);
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
     setPhase("catalog");
     setMessages([]);
     setResultsHistory([]);
     setSelectedResultIdx(0);
     setIsLoading(false);
-    setAwaitingClarification(false);
     setShowSearchHistory(true);
     pickCatalog();
   }
 
-  function addResults(query: string, newResults: ServiceResult[], msgs: { role: "user" | "assistant"; text: string }[]) {
-    setResultsHistory((prev) => [{ query, results: newResults, messages: msgs }, ...prev]);
-    setSelectedResultIdx(0);
-  }
+  function startChat(text: string) {
+    const sessionId = getSessionId();
+    setIsLoading(true);
+    setInput("");
+    botTextRef.current = "";
+    setIsNewSearch(false);
 
-  function updateCurrentEntry(results: ServiceResult[], msgs: { role: "user" | "assistant"; text: string }[]) {
-    setResultsHistory((prev) => {
-      const updated = [...prev];
-      if (updated[selectedResultIdx]) {
-        updated[selectedResultIdx] = { ...updated[selectedResultIdx], results, messages: msgs };
-      }
-      return updated;
-    });
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const pendingResults: ServiceResult[] = [];
+
+    const captureMessages = messages;
+    const userMsg = { role: "user" as const, text };
+
+    setMessages((prev) => [...prev, userMsg]);
+
+    sendChatMessage(
+      sessionId,
+      text,
+      {
+        onSearchResult: (svc) => {
+          pendingResults.push(svc);
+        },
+        onToken: (tokenText) => {
+          botTextRef.current += tokenText;
+          setStreamingText(botTextRef.current);
+        },
+        onDone: () => {
+          setIsLoading(false);
+          setStreamingText("");
+          const assistMsg = { role: "assistant" as const, text: botTextRef.current };
+          const allMsgs = [...captureMessages, userMsg, assistMsg];
+          setMessages(allMsgs);
+          if (pendingResults.length > 0) {
+            const newEntry: HistoryEntry = {
+              query: text,
+              results: pendingResults,
+              messages: allMsgs,
+            };
+            setResultsHistory((prev) => [newEntry, ...prev]);
+            setSelectedResultIdx(0);
+          }
+          setPhase("results");
+        },
+        onError: (errText) => {
+          setIsLoading(false);
+          setStreamingText("");
+          setMessages((prev) => [...prev, { role: "assistant" as const, text: errText }]);
+          setPhase("results");
+        },
+      },
+      controller.signal,
+    );
   }
 
   function handleCatalogSearch() {
     if (!input.trim() || isLoading) return;
     const text = input;
     setInput("");
-    setMessages([{ role: "user", text }]);
     setIsNewSearch(true);
     setIsLoading(true);
     setPhase("chat");
-    loadingTimeout.current = setTimeout(() => {
-      loadingTimeout.current = null;
-      const newMsg = { role: "assistant" as const, text: "Вот что удалось подобрать по вашему запросу:" };
-      setMessages((prev) => [...prev, newMsg]);
-      setTimeout(() => addResults(text, MOCK_RESULTS, [...messages, { role: "user" as const, text }, newMsg]), 0);
-      setIsLoading(false);
-      setIsNewSearch(false);
-      setAwaitingClarification(false);
-      setPhase("results");
-    }, 1800);
+    startChat(text);
   }
 
   function handleSend() {
     if (!input.trim() || isLoading) return;
     const text = input;
     setInput("");
-    const userMsg = { role: "user" as const, text };
-    setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
-    if (phase === "chat" && isNewSearch) {
-      loadingTimeout.current = setTimeout(() => {
-        loadingTimeout.current = null;
-        const assistMsg = { role: "assistant" as const, text: "Вот что удалось подобрать по вашему запросу:" };
-        setMessages((prev) => [...prev, assistMsg]);
-        setTimeout(() => addResults(text, MOCK_RESULTS, [...messages, userMsg, assistMsg]), 0);
-        setIsLoading(false);
-        setIsNewSearch(false);
-        setAwaitingClarification(false);
-        setPhase("results");
-      }, 1800);
-    } else {
-      // Results phase or expanded chat — refine current entry in place
-      if (awaitingClarification) {
-        loadingTimeout.current = setTimeout(() => {
-          loadingTimeout.current = null;
-          const assistMsg = { role: "assistant" as const, text: "Вот результаты с учётом ваших уточнений:" };
-          setMessages((prev) => [...prev, assistMsg]);
-          const setIndex = resultsHistory.length % MOCK_SETS.length;
-          const allMsgs = [...messages, userMsg, assistMsg];
-          updateCurrentEntry(MOCK_SETS[setIndex], allMsgs);
-          setIsLoading(false);
-          setAwaitingClarification(false);
-          if (phase === "chat") setPhase("results");
-        }, 1800);
-      } else if (text.length < 20) {
-        loadingTimeout.current = setTimeout(() => {
-          loadingTimeout.current = null;
-          const assistMsg = {
-            role: "assistant" as const,
-            text: "Уточните, пожалуйста, какой бюджет вы рассматриваете и требуются ли вам соответствие 152-ФЗ?"
-          };
-          setMessages((prev) => [...prev, assistMsg]);
-          const allMsgs = [...messages, userMsg, assistMsg];
-          updateCurrentEntry(resultsHistory[selectedResultIdx]?.results || [], allMsgs);
-          setIsLoading(false);
-          setAwaitingClarification(true);
-          if (phase === "chat") setPhase("results");
-        }, 1000);
-      } else {
-        loadingTimeout.current = setTimeout(() => {
-          loadingTimeout.current = null;
-          const assistMsg = { role: "assistant" as const, text: "Вот обновлённые результаты с учётом ваших уточнений:" };
-          setMessages((prev) => [...prev, assistMsg]);
-          const setIndex = resultsHistory.length % MOCK_SETS.length;
-          const allMsgs = [...messages, userMsg, assistMsg];
-          updateCurrentEntry(MOCK_SETS[setIndex], allMsgs);
-          setIsLoading(false);
-          if (phase === "chat") setPhase("results");
-        }, 1800);
-      }
-    }
+    startChat(text);
   }
 
   function handleNewSearch() {
-    if (loadingTimeout.current) clearTimeout(loadingTimeout.current);
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
     setMessages([]);
     setIsLoading(false);
-    setAwaitingClarification(false);
+    setStreamingText("");
     setIsNewSearch(true);
     setPhase("chat");
   }
@@ -662,7 +549,14 @@ export default function App() {
                   </div>
                 ))
               )}
-              {isLoading && (
+              {isLoading && streamingText && (
+                <div className="flex justify-start animate-in fade-in duration-200">
+                  <div className="bg-muted text-foreground rounded-2xl rounded-bl-md px-3 py-2 sm:px-4 sm:py-3 text-sm leading-relaxed max-w-[90%] sm:max-w-[85%] lg:max-w-[70%]">
+                    {streamingText}
+                  </div>
+                </div>
+              )}
+              {isLoading && !streamingText && (
                 <div className="flex justify-start animate-in fade-in duration-200">
                   <Skeleton className="h-10 sm:h-12 w-3/4 rounded-2xl rounded-bl-md" />
                 </div>
@@ -762,7 +656,14 @@ export default function App() {
               </div>
             </div>
           ))}
-          {isLoading && (
+          {isLoading && streamingText && (
+            <div className="flex justify-start animate-in fade-in duration-200">
+              <div className="bg-muted text-foreground rounded-2xl rounded-bl-md max-w-[90%] px-3 py-2 text-sm leading-relaxed">
+                {streamingText}
+              </div>
+            </div>
+          )}
+          {isLoading && !streamingText && (
             <div className="flex justify-start animate-in fade-in duration-200">
               <Skeleton className="h-10 w-3/4 rounded-2xl rounded-bl-md" />
             </div>

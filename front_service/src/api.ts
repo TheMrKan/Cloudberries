@@ -6,27 +6,116 @@ export interface PricingElement {
   cost: string;
 }
 
-export interface ServiceItem {
+export interface BackendServiceItem {
   id: number;
   name: string;
   provider: string;
   description: string | null;
   compliance_tags: string[];
   regions: string[];
-  pricing_elements: PricingElement[];
+  pricing_elements: BackendPricingElement[];
 }
 
-export interface ServiceResult {
+export interface BackendPricingElement {
+  description?: string;
+  uom?: string;
+  price?: number;
+  name?: string;
+  unit?: string;
+  cost?: string;
+}
+
+export interface BackendServiceResult {
   id: number;
   name: string;
   provider: string;
   description: string | null;
   compliance_tags: string[];
   regions: string[];
-  pricing_elements: PricingElement[];
+  pricing_elements: BackendPricingElement[];
   rationale: string;
   scores: Record<string, string>;
   matched_keywords: string[];
+}
+
+export interface FrontendServiceItem {
+  id: string;
+  name: string;
+  provider: string;
+  tags: string[];
+  description: string;
+  url: string;
+  fz152: boolean;
+  platform?: string;
+  region: string;
+}
+
+export interface FrontendServiceResult {
+  id: string;
+  name: string;
+  provider: string;
+  tags: string[];
+  description: string;
+  url: string;
+  fz152: boolean;
+  platform?: string;
+  region: string;
+  rationale: string;
+  priceScore: number;
+  taskMatchScore: number;
+  criteriaMatchScore: number;
+  pricing_elements: BackendPricingElement[];
+}
+
+function mapRegions(regions: string[]): string {
+  return regions.join(", ") || "Москва";
+}
+
+function hasFz152(tags: string[]): boolean {
+  return tags.some((t) => t.includes("152-ФЗ") || t.includes("ФЗ-152"));
+}
+
+function scoreFromDict(scores: Record<string, string>, ...keys: string[]): number {
+  for (const key of keys) {
+    const val = scores[key];
+    if (val) {
+      const m = val.match(/(\d+)\/10/);
+      if (m) return parseInt(m[1], 10);
+    }
+  }
+  return 5;
+}
+
+export function toFrontendServiceItem(s: BackendServiceItem): FrontendServiceItem {
+  return {
+    id: String(s.id),
+    name: s.name,
+    provider: s.provider,
+    tags: [...(s.compliance_tags || [])],
+    description: s.description || "",
+    url: "",
+    fz152: hasFz152(s.compliance_tags || []),
+    region: mapRegions(s.regions || []),
+  };
+}
+
+export function toFrontendServiceResult(r: BackendServiceResult): FrontendServiceResult {
+  const tags = [...(r.compliance_tags || [])];
+  return {
+    id: String(r.id),
+    name: r.name,
+    provider: r.provider,
+    tags,
+    description: r.description || "",
+    url: "",
+    fz152: hasFz152(tags),
+    region: mapRegions(r.regions || []),
+    rationale: r.rationale,
+    priceScore: scoreFromDict(r.scores, "Стоимость", "Цена", "Price"),
+    taskMatchScore: scoreFromDict(r.scores, "Соответствие задаче", "Task Match"),
+    criteriaMatchScore: scoreFromDict(r.scores, "Соответствие критериям", "Criteria Match", "Соответствие"),
+    pricing_elements: r.pricing_elements,
+  };
 }
 
 export interface Message {
@@ -37,11 +126,11 @@ export interface Message {
 export interface SessionData {
   session_id: string;
   messages: Message[];
-  results: ServiceResult[];
+  results: FrontendServiceResult[];
 }
 
 export interface SSECallbacks {
-  onSearchResult: (service: ServiceResult) => void;
+  onSearchResult: (service: FrontendServiceResult) => void;
   onToken: (text: string) => void;
   onDone: () => void;
   onError: (errorText: string) => void;
@@ -62,10 +151,11 @@ export function resetSessionId(): string {
   return id;
 }
 
-export async function fetchServices(): Promise<ServiceItem[]> {
+export async function fetchServices(): Promise<FrontendServiceItem[]> {
   const res = await fetch(`${BASE_URL}/services`);
   if (!res.ok) throw new Error("Failed to fetch services");
-  return res.json();
+  const data: BackendServiceItem[] = await res.json();
+  return data.map(toFrontendServiceItem);
 }
 
 export async function fetchSession(sessionId: string): Promise<SessionData | null> {
@@ -127,10 +217,11 @@ export async function sendChatMessage(
           eventData = line.slice(6);
         } else if (line === "") {
           if (eventType === "search_result" && eventData) {
-            callbacks.onSearchResult(JSON.parse(eventData));
+            const raw: BackendServiceResult = JSON.parse(eventData);
+            callbacks.onSearchResult(toFrontendServiceResult(raw));
           } else if (eventType === "token" && eventData) {
             const parsed = JSON.parse(eventData);
-            callbacks.onToken(parsed.text);
+            callbacks.onToken(parsed.text ?? parsed);
           } else if (eventType === "done") {
             callbacks.onDone();
           } else if (eventType === "error" && eventData) {
