@@ -58,14 +58,18 @@ ANNOTATION_PROMPT = (
     "ВАЖНО: Используй ТОЛЬКО сервисы из переданного списка. "
     "Поле id в каждом объекте services должно строго соответствовать service_id из результатов поиска. "
     "НЕ выдумывай сервисы и не используй id, которых нет в результатах.\n\n"
+    "Для каждого сервиса выбери ТОП-5 наиболее релевантных запросу элементов тарификации "
+    "из поля pricing_elements. Если элементов меньше 5 — верни все.\n\n"
     "Верни JSON строго в формате:\n"
-    '{"answer": "короткая фраза как я понял запрос", "services": [{"id": 1, "rationale": "текст", "scores": {"Стоимость": "9/10", "Соответствие задаче": "10/10"}}]}\n\n'
+    '{"answer": "короткая фраза как я понял запрос", "services": [{"id": 1, "rationale": "текст", "scores": {"Стоимость": "9/10", "Соответствие задаче": "10/10"}, "pricing": [{"description": "...", "uom": "...", "price": 123.45}]}]}\n\n'
     "answer — короткая фраза (1 предложение) о том, как понят запрос пользователя, "
     "например: 'Ищу серверы с GPU, отфильтровано по ФЗ-152'.\n"
     "scores — dict с произвольными названиями критериев и оценками в формате 'N/10'.\n"
     "rationale — подробное обоснование в формате: "
     "'N место. Критерий1 N/10 — почему. Критерий2 N/10 — почему. Итог.' "
     "Обязательно объяснить, почему именно такие баллы и почему сервис на этом месте.\n"
+    "pricing — массив из топ-5 элементов pricing_elements, наиболее релевантных запросу. "
+    'Каждый элемент: {"description": "...", "uom": "...", "price": число}.\n'
     "services — массив ровно из 3 объектов (или меньше, если нет). "
     "Первый в массиве = лучший, последний = худший."
 )
@@ -82,7 +86,11 @@ async def llm_complete(messages: list[dict]) -> dict:
     ]
 
     print(f"[LLM] call model={settings.llm_model} messages={len(openai_messages)}")
-    client = AsyncOpenAI(api_key=settings.llm_api_key, base_url=settings.llm_base_url, project=settings.llm_project_id)
+    client = AsyncOpenAI(
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_base_url,
+        project=settings.llm_project_id,
+    )
     response = await client.chat.completions.create(
         model=settings.llm_model,
         messages=openai_messages,
@@ -152,7 +160,11 @@ async def llm_with_results(
         },
     ]
 
-    client = AsyncOpenAI(api_key=settings.llm_api_key, base_url=settings.llm_base_url, project=settings.llm_project_id)
+    client = AsyncOpenAI(
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_base_url,
+        project=settings.llm_project_id,
+    )
     response = await client.chat.completions.create(
         model=settings.llm_model,
         messages=openai_messages,

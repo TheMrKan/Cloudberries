@@ -34,7 +34,7 @@ def _to_service_result(svc: dict, annotations: list[dict]) -> dict:
         "description": svc.get("description"),
         "compliance_tags": svc.get("compliance_tags", []) or svc.get("compliance", []),
         "regions": svc.get("regions", []),
-        "pricing_elements": svc.get("pricing_elements", []),
+        "pricing_elements": ann.get("pricing") or svc.get("pricing_elements", []),
         "rationale": ann.get("rationale", ""),
         "scores": ann.get("scores", {}),
         "matched_keywords": svc.get("matched_keywords", []),
