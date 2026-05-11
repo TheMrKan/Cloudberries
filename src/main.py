@@ -16,8 +16,6 @@ from src.search.qdrant_client import get_qdrant_client, ensure_collection
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(BaseModel.metadata.create_all)
     try:
         qc = get_qdrant_client()
         ensure_collection(qc)

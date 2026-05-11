@@ -6,8 +6,8 @@ settings = Settings()
 
 def get_qdrant_client() -> QdrantClient:
     return QdrantClient(
-        url="http://localhost:6333",
-        api_key="cloudberries-secret-key",
+        url=settings.qdrant_url,
+        api_key=settings.qdrant_api_key,
         timeout=30,
     )
 

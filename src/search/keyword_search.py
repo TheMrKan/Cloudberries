@@ -73,6 +73,7 @@ class KeywordSearchEngine:
                     "service_id": svc["service_id"],
                     "name": svc["name"],
                     "provider_name": svc.get("provider_name", ""),
+                    "description": svc.get("description"),
                     "keywords": svc.get("keywords") or [],
                     "compliance_tags": svc.get("compliance_tags") or [],
                     "regions": svc.get("regions") or [],
@@ -103,6 +104,7 @@ async def init_keyword_search(db_session):
         select(
             Service.service_id,
             Service.name,
+            Service.description,
             Service.keywords,
             Service.compliance_tags,
             Service.regions,
@@ -117,6 +119,7 @@ async def init_keyword_search(db_session):
             "service_id": row["service_id"],
             "name": row["name"],
             "provider_name": row["provider_name"],
+            "description": row.get("description") or "",
             "keywords": row["keywords"] if isinstance(row["keywords"], list) else [],
             "compliance_tags": row["compliance_tags"]
             if isinstance(row["compliance_tags"], list)

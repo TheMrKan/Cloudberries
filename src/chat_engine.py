@@ -36,7 +36,7 @@ def _to_service_result(svc: dict, annotations: list[dict]) -> dict:
         "name": svc["name"],
         "provider": svc.get("provider_name", ""),
         "description": svc.get("description"),
-        "compliance_tags": svc.get("compliance_tags", []),
+        "compliance_tags": svc.get("compliance_tags", []) or svc.get("compliance", []),
         "regions": svc.get("regions", []),
         "pricing_elements": svc.get("pricing_elements", []),
         "rationale": ann.get("rationale", ""),
@@ -75,6 +75,10 @@ async def _run_search_tool(structured) -> list[dict]:
             limit=20,
             filters=qdrant_filters,
         )
+
+        # normalize Qdrant payload keys to match BM25
+        for r in vec_results:
+            r["compliance_tags"] = r.pop("compliance", r.get("compliance_tags", []))
 
         seen = {r["service_id"] for r in all_results}
         for r in vec_results:
@@ -137,10 +141,14 @@ async def chat_pipeline(
         print(f"[ENGINE] answer={answer[:200]}")
         print(f"[ENGINE] annotations={annotations}")
 
-        # emit search_result events only for annotated (top) services
-        ann_ids = {a["id"] for a in annotations}
-        for svc in results:
-            if svc["service_id"] not in ann_ids:
+        # emit search_result events in annotations order (top-3 ranking)
+        svc_by_id = {s["service_id"]: s for s in results}
+        for ann in annotations:
+            svc = svc_by_id.get(ann.get("id"))
+            if svc is None:
+                print(
+                    f"[ENGINE] WARNING: annotation id={ann.get('id')} not found in results"
+                )
                 continue
             result_item = _to_service_result(svc, annotations)
             yield _sse("search_result", result_item)

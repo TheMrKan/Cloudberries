@@ -11,5 +11,6 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_base_url: str = "https://api.openai.com/v1"
     llm_model: str = "gpt-4o-mini"
+    llm_project_id: str | None = None
 
     model_config = {"env_file": ".env"}

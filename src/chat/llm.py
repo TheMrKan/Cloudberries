@@ -55,6 +55,9 @@ ANNOTATION_PROMPT = (
     "На основе результатов поиска составь ответ пользователю.\n\n"
     "Выбери ровно ТОП-3 наиболее подходящих сервиса и отсортируй от лучшего к худшему.\n"
     "Если сервисов меньше 3 — верни сколько есть.\n\n"
+    "ВАЖНО: Используй ТОЛЬКО сервисы из переданного списка. "
+    "Поле id в каждом объекте services должно строго соответствовать service_id из результатов поиска. "
+    "НЕ выдумывай сервисы и не используй id, которых нет в результатах.\n\n"
     "Верни JSON строго в формате:\n"
     '{"answer": "короткая фраза как я понял запрос", "services": [{"id": 1, "rationale": "текст", "scores": {"Стоимость": "9/10", "Соответствие задаче": "10/10"}}]}\n\n'
     "answer — короткая фраза (1 предложение) о том, как понят запрос пользователя, "
@@ -79,7 +82,7 @@ async def llm_complete(messages: list[dict]) -> dict:
     ]
 
     print(f"[LLM] call model={settings.llm_model} messages={len(openai_messages)}")
-    client = AsyncOpenAI(api_key=settings.llm_api_key, base_url=settings.llm_base_url)
+    client = AsyncOpenAI(api_key=settings.llm_api_key, base_url=settings.llm_base_url, project=settings.llm_project_id)
     response = await client.chat.completions.create(
         model=settings.llm_model,
         messages=openai_messages,
@@ -129,6 +132,13 @@ async def llm_with_results(
     }
     print(f"[LLM] llm_with_results tool_results={len(tool_results)}")
 
+    available_ids = {r.get("service_id") for r in tool_results}
+    available_descr = (
+        "Доступные service_id для выбора: "
+        + ", ".join(sorted(str(i) for i in available_ids))
+        + "."
+    )
+
     openai_messages = [
         {"role": "system", "content": ANNOTATION_PROMPT},
         *_to_openai(history),
@@ -136,16 +146,18 @@ async def llm_with_results(
         {
             "role": "tool",
             "tool_call_id": raw_message.tool_calls[0].id,
-            "content": json.dumps(tool_results, ensure_ascii=False, default=str),
+            "content": available_descr
+            + "\n\n"
+            + json.dumps(tool_results, ensure_ascii=False, default=str),
         },
     ]
 
-    client = AsyncOpenAI(api_key=settings.llm_api_key, base_url=settings.llm_base_url)
+    client = AsyncOpenAI(api_key=settings.llm_api_key, base_url=settings.llm_base_url, project=settings.llm_project_id)
     response = await client.chat.completions.create(
         model=settings.llm_model,
         messages=openai_messages,
         response_format={"type": "json_object"},
-        temperature=0
+        temperature=0,
     )
 
     raw = response.choices[0].message.content or "{}"
