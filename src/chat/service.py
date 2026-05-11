@@ -9,10 +9,12 @@ from src.db.models import ChatSession
 
 class ChatService:
     @staticmethod
-    async def create_session(db: AsyncSession) -> str:
-        session_id = str(uuid4())
-        db.add(ChatSession(session_id=session_id, context={}))
-        await db.commit()
+    async def create_session(db: AsyncSession, session_id: str | None = None) -> str:
+        session_id = session_id or str(uuid4())
+        exists = await db.get(ChatSession, session_id)
+        if not exists:
+            db.add(ChatSession(session_id=session_id, context={}))
+            await db.commit()
         return session_id
 
     @staticmethod

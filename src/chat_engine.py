@@ -13,6 +13,32 @@ def _make_embedding(text: str) -> list[float]:
     return [0.0] * 384
 
 
+def _sse(event: str, data):
+    return (
+        f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False, default=str)}\n\n"
+    )
+
+
+def _to_service_result(svc: dict, annotations: list[dict]) -> dict:
+    """Конвертирует сырой результат поиска в ServiceResult."""
+    ann = {}
+    for a in annotations:
+        if a.get("id") == svc["service_id"]:
+            ann = a
+            break
+    return {
+        "id": svc["service_id"],
+        "name": svc["name"],
+        "provider": svc.get("provider_name", ""),
+        "description": svc.get("description"),
+        "compliance_tags": svc.get("compliance_tags", []),
+        "regions": svc.get("regions", []),
+        "pricing_elements": svc.get("pricing_elements", []),
+        "rationale": ann.get("rationale", ""),
+        "scores": ann.get("scores", {}),
+    }
+
+
 async def _run_search_tool(structured) -> list[dict]:
     print(
         f"[SEARCH] keyword_query={structured.keyword_search_query} vector_query={structured.vector_search_query} compliance={structured.compliance_filter} regions={structured.regions_filter}"
@@ -60,55 +86,54 @@ async def chat_pipeline(
 ) -> AsyncGenerator[str, None]:
     session = await ChatService.get_session(db, session_id)
     if not session:
-        yield json.dumps({"event": "error", "data": {"text": "Session not found"}})
+        yield _sse("error", {"text": "Session not found"})
         return
 
     history = session.messages
 
     print(f"[ENGINE] history_len={len(history)} text={text}")
 
-    # Шаг 1: LLM решает — ответить или вызвать tool
     print("[ENGINE] step1: calling llm_complete...")
     decision = await llm_complete([*history, {"role": "user", "text": text}])
     print(f"[ENGINE] step1: decision keys={list(decision.keys())}")
 
+    final_results = []
+
     if "tool_call" in decision:
-        # Шаг 2: шлём событие о вызове тула
         structured = decision["tool_call"]
         structured_dump = structured.model_dump(exclude_none=True)
-        print(f"[ENGINE] step2: tool_call args={structured_dump}")
-        yield json.dumps(
-            {
-                "event": "tool_call",
-                "data": {
-                    "tool": "search_services",
-                    "arguments": structured_dump,
-                },
-            }
-        )
+        print(f"[ENGINE] tool_call args={structured_dump}")
 
-        # Шаг 3: выполняем поиск
-        print("[ENGINE] step3: running search...")
+        print("[ENGINE] running search...")
         results = await _run_search_tool(structured)
-        print(f"[ENGINE] step3: results count={len(results)}")
+        print(f"[ENGINE] search results count={len(results)}")
 
-        yield json.dumps({"event": "services", "data": results})
-
-        # Шаг 4: LLM формирует ответ на основе результатов
-        print("[ENGINE] step4: calling llm_with_results...")
-        answer = await llm_with_results(
+        print("[ENGINE] calling llm_with_results...")
+        answer, annotations = await llm_with_results(
             [*history, {"role": "user", "text": text}],
             decision["raw_message"],
             results,
         )
-        print(f"[ENGINE] step4: answer={answer[:200]}")
+        print(f"[ENGINE] answer={answer[:200]}")
+        print(f"[ENGINE] annotations={annotations}")
+
+        # emit search_result events
+        for svc in results:
+            result_item = _to_service_result(svc, annotations)
+            yield _sse("search_result", result_item)
+            final_results.append(result_item)
 
     else:
         answer = decision.get("content", "")
-        print(f"[ENGINE] else: text answer={answer[:200]}")
+        print(f"[ENGINE] text answer={answer[:200]}")
 
-    yield json.dumps({"event": "message", "data": {"text": answer}})
+    # emit token event(s) with answer
+    yield _sse("token", answer)
 
+    # store results in session for later retrieval
     await ChatService.append_message(db, session_id, "assistant", answer)
+    if final_results:
+        session.results = final_results
+        await db.commit()
 
-    yield json.dumps({"event": "done", "data": None})
+    yield _sse("done", None)

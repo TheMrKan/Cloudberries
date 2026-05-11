@@ -9,13 +9,10 @@
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; height: 100vh; display: flex; justify-content: center; align-items: center; }
   #app { width: 600px; height: 80vh; background: white; border-radius: 12px; box-shadow: 0 2px 20px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; }
   #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
-  .msg { max-width: 80%; padding: 10px 14px; border-radius: 12px; line-height: 1.4; font-size: 14px; }
+  .msg { max-width: 80%; padding: 10px 14px; border-radius: 12px; line-height: 1.4; font-size: 14px; white-space: pre-wrap; }
   .msg.user { background: #007aff; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
   .msg.bot { background: #e9e9eb; color: #1c1c1e; align-self: flex-start; border-bottom-left-radius: 4px; }
   .msg .meta { font-size: 11px; opacity: 0.6; margin-top: 4px; }
-  #question-area { padding: 12px 20px; border-top: 1px solid #e5e5ea; display: flex; flex-wrap: wrap; gap: 8px; }
-  #question-area button { padding: 8px 16px; border-radius: 20px; border: 1px solid #007aff; background: white; color: #007aff; cursor: pointer; font-size: 13px; }
-  #question-area button:hover { background: #007aff; color: white; }
   #input-bar { display: flex; padding: 12px 20px; border-top: 1px solid #e5e5ea; gap: 8px; }
   #input-bar input { flex: 1; padding: 8px 12px; border-radius: 20px; border: 1px solid #c7c7cc; outline: none; font-size: 14px; }
   #input-bar button { padding: 8px 20px; border-radius: 20px; border: none; background: #007aff; color: white; cursor: pointer; font-size: 14px; }
@@ -23,14 +20,15 @@
   #loading { display: none; text-align: center; padding: 8px; color: #8e8e93; font-size: 13px; }
   #services { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
   .service-card { padding: 10px 14px; background: #f0f4ff; border-radius: 8px; border: 1px solid #d0d9f0; font-size: 13px; }
-  .service-card .provider { font-weight: 600; }
-  .service-card .price { color: #007aff; }
+  .service-card .name { font-weight: 600; }
+  .service-card .provider { color: #555; }
+  .service-card .scores { color: #007aff; font-size: 12px; margin-top: 4px; }
+  .service-card .rationale { color: #333; font-size: 12px; margin-top: 4px; font-style: italic; }
 </style>
 </head>
 <body>
 <div id="app">
   <div id="messages"></div>
-  <div id="question-area" style="display:none"></div>
   <div id="loading">Бот печатает...</div>
   <div id="input-bar">
     <input id="input" type="text" placeholder="Напишите сообщение..." autofocus>
@@ -38,48 +36,38 @@
   </div>
 </div>
 <script>
-let sessionId = null;
+let sessionId = crypto.randomUUID();
 let loading = false;
+let pendingServices = [];
 
 const messagesEl = document.getElementById('messages');
 const inputEl = document.getElementById('input');
 const sendBtn = document.getElementById('send-btn');
 const loadingEl = document.getElementById('loading');
-const questionArea = document.getElementById('question-area');
 
-async function init() {
-  const res = await fetch('/api/chat/init', { method: 'POST' });
-  const data = await res.json();
-  sessionId = data.session_id;
-  addMessage('bot', 'Здравствуйте! Опишите вашу задачу, и я помогу подобрать облачного провайдера.');
-}
-
-function addMessage(role, text, events) {
+function addMessage(role, text, services) {
   const el = document.createElement('div');
   el.className = `msg ${role}`;
-  el.textContent = text;
-  if (events) {
-    const evDiv = document.createElement('div');
-    evDiv.id = 'services';
-    events.forEach(s => {
-      evDiv.innerHTML += `<div class="service-card"><span class="provider">${s.provider_name || ''}</span> — ${s.name || ''}<br><span class="price">${(s.pricing_elements || []).map(e => `${e.price} ${e.uom}`).join(', ')}</span></div>`;
+  const textEl = document.createElement('div');
+  textEl.textContent = text;
+  el.appendChild(textEl);
+  if (services && services.length) {
+    const svcDiv = document.createElement('div');
+    svcDiv.id = 'services';
+    svcDiv.style = 'margin-top: 8px;';
+    services.forEach(s => {
+      svcDiv.innerHTML += `<div class="service-card">
+        <div class="name">${s.name}</div>
+        <div class="provider">${s.provider}</div>
+        ${s.rationale ? `<div class="rationale">${s.rationale}</div>` : ''}
+        <div class="scores">${Object.entries(s.scores).map(([k,v]) => `${k}: ${v}`).join('  ·  ')}</div>
+      </div>`;
     });
-    el.appendChild(evDiv);
+    el.appendChild(svcDiv);
   }
   el.innerHTML += `<div class="meta">${role === 'user' ? 'Вы' : 'Бот'}</div>`;
   messagesEl.appendChild(el);
   messagesEl.scrollTop = messagesEl.scrollHeight;
-}
-
-function showQuestion(question, options) {
-  questionArea.style.display = 'flex';
-  questionArea.innerHTML = `<span style="font-size:13px;color:#555;width:100%;margin-bottom:4px">${question}</span>`;
-  options.forEach(opt => {
-    const btn = document.createElement('button');
-    btn.textContent = opt;
-    btn.onclick = () => { questionArea.style.display = 'none'; send(opt); };
-    questionArea.appendChild(btn);
-  });
 }
 
 async function send(text) {
@@ -92,8 +80,11 @@ async function send(text) {
   addMessage('user', text);
   inputEl.value = '';
 
+  pendingServices = [];
+  let botMessageEl = null;
+
   try {
-    const res = await fetch('/api/chat/send', {
+    const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_id: sessionId, message: text }),
@@ -102,6 +93,9 @@ async function send(text) {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let botText = '';
+    let eventType = '';
+    let eventData = '';
 
     while (true) {
       const { done, value } = await reader.read();
@@ -110,24 +104,34 @@ async function send(text) {
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
       for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const payload = line.slice(6);
-        try {
-          const ev = JSON.parse(payload);
-          if (ev.event === 'message') {
-            addMessage('bot', ev.data.text);
-          } else if (ev.event === 'question') {
-            showQuestion(ev.data.question, ev.data.options);
-          } else if (ev.event === 'services') {
-            addMessage('bot', 'Подходящие варианты:', ev.data);
-          } else if (ev.event === 'done') {
+        if (line.startsWith('event: ')) {
+          eventType = line.slice(7);
+          continue;
+        }
+        if (line.startsWith('data: ')) {
+          eventData = line.slice(6);
+          continue;
+        }
+        if (line === '') {
+          if (eventType === 'search_result') {
+            try { pendingServices.push(JSON.parse(eventData)); } catch {}
+          } else if (eventType === 'token') {
+            botText += JSON.parse(eventData);
           }
-        } catch {}
+          eventType = '';
+          eventData = '';
+        }
       }
+    }
+    if (botText) {
+      addMessage('bot', botText);
     }
   } catch (err) {
     addMessage('bot', 'Ошибка соединения');
   } finally {
+    if (pendingServices.length) {
+      addMessage('bot', 'Подходящие варианты:', pendingServices);
+    }
     loading = false;
     loadingEl.style.display = 'none';
     sendBtn.disabled = false;
@@ -138,8 +142,6 @@ async function send(text) {
 
 sendBtn.onclick = () => { const t = inputEl.value.trim(); if (t) send(t); };
 inputEl.onkeydown = e => { if (e.key === 'Enter') sendBtn.click(); };
-
-init();
 </script>
 </body>
 </html>

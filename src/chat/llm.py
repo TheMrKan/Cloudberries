@@ -51,18 +51,21 @@ TOOL_DEF = {
     },
 }
 
+ANNOTATION_PROMPT = (
+    "На основе результатов поиска составь ответ пользователю.\n\n"
+    "Верни JSON строго в формате:\n"
+    '{"answer": "текст ответа", "services": [{"id": 1, "rationale": "почему подходит", "scores": {"Стоимость": "7/10", "Соответствие задаче": "8/10"}}]}\n\n'
+    "scores — dict с произвольными названиями критериев и оценками в формате 'N/10'.\n"
+    "rationale — короткое обоснование (1-2 предложения) на русском.\n"
+    "answer — ответ пользователю с перечислением подходящих сервисов."
+)
+
 
 def _to_openai(messages: list[dict]) -> list[dict]:
     return [{"role": m["role"], "content": m["text"]} for m in messages]
 
 
 async def llm_complete(messages: list[dict]) -> dict:
-    """
-    Вызывает LLM с историей и tool definitions.
-    Возвращает:
-      {"role": "assistant", "content": str}
-      {"role": "assistant", "tool_call": StructuredSearch, "raw_message": ChatCompletionMessage}
-    """
     openai_messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         *_to_openai(messages),
@@ -100,10 +103,8 @@ async def llm_with_results(
     history: list[dict],
     raw_message,
     tool_results: list[dict],
-) -> str:
-    """
-    Передаёт результаты поиска обратно LLM для формирования ответа пользователю.
-    """
+) -> tuple[str, list[dict]]:
+    """Returns (answer_text, annotations) where annotations = [{id, rationale, scores}]."""
     raw_dict = {
         "role": "assistant",
         "content": raw_message.content,
@@ -120,8 +121,9 @@ async def llm_with_results(
         ],
     }
     print(f"[LLM] llm_with_results tool_results={len(tool_results)}")
+
     openai_messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": ANNOTATION_PROMPT},
         *_to_openai(history),
         raw_dict,
         {
@@ -135,8 +137,18 @@ async def llm_with_results(
     response = await client.chat.completions.create(
         model=settings.llm_model,
         messages=openai_messages,
+        response_format={"type": "json_object"},
     )
 
-    answer = response.choices[0].message.content or "Ничего не нашлось."
-    print(f"[LLM] llm_with_results answer={answer[:200]}")
-    return answer
+    raw = response.choices[0].message.content or "{}"
+    print(f"[LLM] llm_with_results raw={raw[:300]}")
+
+    try:
+        data = json.loads(raw)
+        answer = data.get("answer", "Ничего не нашлось.")
+        annotations = data.get("services", [])
+    except json.JSONDecodeError:
+        answer = raw
+        annotations = []
+
+    return answer, annotations

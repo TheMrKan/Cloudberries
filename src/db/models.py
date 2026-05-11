@@ -53,6 +53,9 @@ class ChatSession(BaseModel):
     session_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     context: Mapped[dict] = mapped_column(JSON, default=lambda: {})
     messages: Mapped[list[dict]] = mapped_column(JSON, default=lambda: [])
+    results: Mapped[list[dict] | None] = mapped_column(
+        JSON, nullable=True, default=None
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()

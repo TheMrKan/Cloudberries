@@ -8,17 +8,38 @@ class StructuredSearch(BaseModel):
     regions_filter: list[str] | None = None
 
 
-class ChatInitResponse(BaseModel):
-    session_id: str
+class ServiceItem(BaseModel):
+    id: int
+    name: str
+    provider: str
+    description: str | None = None
+    compliance_tags: list[str] = []
+    regions: list[str] = []
+    pricing_elements: list[dict] = []
 
 
-class ChatSendRequest(BaseModel):
+class ServiceResult(BaseModel):
+    id: int
+    name: str
+    provider: str
+    description: str | None = None
+    compliance_tags: list[str] = []
+    regions: list[str] = []
+    pricing_elements: list[dict] = []
+    rationale: str = ""
+    scores: dict[str, str]
+
+
+class ChatRequest(BaseModel):
     session_id: str
     message: str
 
 
-class MessageOut(BaseModel):
-    role: str
-    text: str
-    events: list[dict] | None = None
-    created_at: str | None = None
+class SessionResponse(BaseModel):
+    session_id: str
+    messages: list[dict]
+    results: list[dict] | None = None
+
+
+class ChatInitResponse(BaseModel):
+    session_id: str
