@@ -117,8 +117,11 @@ async def chat_pipeline(
         print(f"[ENGINE] answer={answer[:200]}")
         print(f"[ENGINE] annotations={annotations}")
 
-        # emit search_result events
+        # emit search_result events only for annotated (top) services
+        ann_ids = {a["id"] for a in annotations}
         for svc in results:
+            if svc["service_id"] not in ann_ids:
+                continue
             result_item = _to_service_result(svc, annotations)
             yield _sse("search_result", result_item)
             final_results.append(result_item)
