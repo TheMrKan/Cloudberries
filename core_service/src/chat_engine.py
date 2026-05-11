@@ -78,10 +78,23 @@ async def _run_search_tool(structured) -> list[dict]:
         seen = {r["service_id"] for r in all_results}
         for r in vec_results:
             if r["service_id"] not in seen:
+                r["_source"] = "vector"
                 all_results.append(r)
                 seen.add(r["service_id"])
+            else:
+                existing = next(
+                    x for x in all_results if x["service_id"] == r["service_id"]
+                )
+                existing["_source"] = "keyword+vector"
+    else:
+        for r in all_results:
+            r["_source"] = "keyword"
 
     if structured.keyword_search_query:
+        for r in all_results:
+            print(
+                f"[SEARCH] {r['name']} source={r.get('_source', '?')} score={r.get('score')}"
+            )
         query_tokens = _tokenize(structured.keyword_search_query)
         for r in all_results:
             matched = []
