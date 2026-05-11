@@ -6,12 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.chat.llm import llm_complete, llm_with_results
 from src.chat.service import ChatService
+from src.search.embeddings import get_embedding
 from src.search.keyword_search import get_engine as get_keyword_engine
 from src.search.qdrant_client import get_qdrant_client, search_vector
-
-
-def _make_embedding(text: str) -> list[float]:
-    return [0.0] * 384
 
 
 def _tokenize(text: str) -> list[str]:
@@ -25,7 +22,6 @@ def _sse(event: str, data):
 
 
 def _to_service_result(svc: dict, annotations: list[dict]) -> dict:
-    """Конвертирует сырой результат поиска в ServiceResult."""
     ann = {}
     for a in annotations:
         if a.get("id") == svc["service_id"]:
@@ -62,7 +58,7 @@ async def _run_search_tool(structured) -> list[dict]:
 
     if structured.vector_search_query:
         qdrant = get_qdrant_client()
-        vec = _make_embedding(structured.vector_search_query)
+        vec = await get_embedding(structured.vector_search_query)
         qdrant_filters = {}
         if structured.compliance_filter:
             qdrant_filters["compliance"] = structured.compliance_filter
@@ -76,7 +72,6 @@ async def _run_search_tool(structured) -> list[dict]:
             filters=qdrant_filters,
         )
 
-        # normalize Qdrant payload keys to match BM25
         for r in vec_results:
             r["compliance_tags"] = r.pop("compliance", r.get("compliance_tags", []))
 
@@ -86,7 +81,6 @@ async def _run_search_tool(structured) -> list[dict]:
                 all_results.append(r)
                 seen.add(r["service_id"])
 
-    # compute matched_keywords for each result
     if structured.keyword_search_query:
         query_tokens = _tokenize(structured.keyword_search_query)
         for r in all_results:
@@ -141,7 +135,6 @@ async def chat_pipeline(
         print(f"[ENGINE] answer={answer[:200]}")
         print(f"[ENGINE] annotations={annotations}")
 
-        # emit search_result events in annotations order (top-3 ranking)
         svc_by_id = {s["service_id"]: s for s in results}
         for ann in annotations:
             svc = svc_by_id.get(ann.get("id"))
@@ -158,10 +151,8 @@ async def chat_pipeline(
         answer = decision.get("content", "")
         print(f"[ENGINE] text answer={answer[:200]}")
 
-    # emit token event(s) with answer
     yield _sse("token", answer)
 
-    # store results in session for later retrieval
     await ChatService.append_message(db, session_id, "assistant", answer)
     if final_results:
         session.results = final_results

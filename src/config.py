@@ -12,5 +12,6 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://api.openai.com/v1"
     llm_model: str = "gpt-4o-mini"
     llm_project_id: str | None = None
+    embedding_model: str = "text-embedding-3-small"
 
     model_config = {"env_file": ".env"}

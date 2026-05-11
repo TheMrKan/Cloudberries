@@ -1,4 +1,5 @@
 from src.config import Settings
+from src.search.embeddings import EMBEDDING_DIMENSION
 from qdrant_client import QdrantClient, models
 
 settings = Settings()
@@ -19,7 +20,7 @@ def ensure_collection(client: QdrantClient) -> None:
     client.recreate_collection(
         collection_name=COLLECTION_NAME,
         vectors_config=models.VectorParams(
-            size=384,
+            size=EMBEDDING_DIMENSION,
             distance=models.Distance.COSINE,
         ),
     )

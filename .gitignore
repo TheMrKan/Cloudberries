@@ -1,6 +1,7 @@
 *.pdf
 /.idea/
 /pgdata
+/qdrant_data
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
