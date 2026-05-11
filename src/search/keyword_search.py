@@ -73,6 +73,7 @@ class KeywordSearchEngine:
                     "service_id": svc["service_id"],
                     "name": svc["name"],
                     "provider_name": svc.get("provider_name", ""),
+                    "keywords": svc.get("keywords") or [],
                     "compliance_tags": svc.get("compliance_tags") or [],
                     "regions": svc.get("regions") or [],
                     "pricing_elements": svc.get("pricing_elements") or [],

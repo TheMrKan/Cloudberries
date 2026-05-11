@@ -23,6 +23,7 @@
   .service-card .name { font-weight: 600; }
   .service-card .provider { color: #555; }
   .service-card .scores { color: #007aff; font-size: 12px; margin-top: 4px; }
+  .service-card .tags { color: #e67e22; font-size: 12px; margin-top: 4px; }
   .service-card .rationale { color: #333; font-size: 12px; margin-top: 4px; font-style: italic; }
 </style>
 </head>
@@ -60,7 +61,8 @@ function addMessage(role, text, services) {
         <div class="name">${s.name}</div>
         <div class="provider">${s.provider}</div>
         ${s.rationale ? `<div class="rationale">${s.rationale}</div>` : ''}
-        <div class="scores">${Object.entries(s.scores).map(([k,v]) => `${k}: ${v}`).join('  ·  ')}</div>
+        ${s.matched_keywords?.length ? `<div class="tags">Совпало: ${s.matched_keywords.join(', ')}</div>` : ''}
+        <div class="scores">${Object.entries(s.scores).map(([k,v]) => `${k}: ${v}`).join(' · ')}</div>
       </div>`;
     });
     el.appendChild(svcDiv);

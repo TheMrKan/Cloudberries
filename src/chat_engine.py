@@ -1,4 +1,5 @@
 import json
+import re
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +12,10 @@ from src.search.qdrant_client import get_qdrant_client, search_vector
 
 def _make_embedding(text: str) -> list[float]:
     return [0.0] * 384
+
+
+def _tokenize(text: str) -> list[str]:
+    return re.findall(r"\w+", text.lower())
 
 
 def _sse(event: str, data):
@@ -36,6 +41,7 @@ def _to_service_result(svc: dict, annotations: list[dict]) -> dict:
         "pricing_elements": svc.get("pricing_elements", []),
         "rationale": ann.get("rationale", ""),
         "scores": ann.get("scores", {}),
+        "matched_keywords": svc.get("matched_keywords", []),
     }
 
 
@@ -75,6 +81,20 @@ async def _run_search_tool(structured) -> list[dict]:
             if r["service_id"] not in seen:
                 all_results.append(r)
                 seen.add(r["service_id"])
+
+    # compute matched_keywords for each result
+    if structured.keyword_search_query:
+        query_tokens = _tokenize(structured.keyword_search_query)
+        for r in all_results:
+            matched = []
+            for kw in r.get("keywords") or []:
+                kw_lower = kw.lower()
+                if any(t in kw_lower for t in query_tokens):
+                    matched.append(kw)
+            r["matched_keywords"] = sorted(matched)
+    else:
+        for r in all_results:
+            r["matched_keywords"] = []
 
     return all_results[:10]
 

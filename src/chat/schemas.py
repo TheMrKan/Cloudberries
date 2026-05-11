@@ -28,6 +28,7 @@ class ServiceResult(BaseModel):
     pricing_elements: list[dict] = []
     rationale: str = ""
     scores: dict[str, str]
+    matched_keywords: list[str] = []
 
 
 class ChatRequest(BaseModel):
