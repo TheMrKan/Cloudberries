@@ -7,6 +7,7 @@ import { Badge } from "./components/ui/badge";
 import { Skeleton } from "./components/ui/skeleton";
 import {
   getSessionId,
+  resetSessionId,
   fetchServices,
   sendChatMessage,
 } from "./api";
@@ -330,6 +331,7 @@ export default function App() {
 
   function handleNewSearch() {
     if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
+    resetSessionId();
     setMessages([]);
     setIsLoading(false);
     setStreamingText("");
