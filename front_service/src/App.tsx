@@ -296,7 +296,9 @@ export default function App() {
             };
             setResultsHistory((prev) => [newEntry, ...prev]);
             setSelectedResultIdx(0);
-            setPhase("results");
+            if (pendingResults.length > 0) {
+              setPhase("results");
+            }
           },
         onError: (errText) => {
           setIsLoading(false);

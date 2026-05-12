@@ -61,8 +61,14 @@ class KeywordSearchEngine:
 
             if compliance_filter:
                 tags = svc.get("compliance_tags") or []
-                if not all(t in tags for t in compliance_filter):
-                    continue
+                expanded = []
+                for t in compliance_filter:
+                    expanded.append(t)
+                    if t in ("152-ФЗ", "ФЗ-152"):
+                        expanded.append("ФЗ-152" if t == "152-ФЗ" else "152-ФЗ")
+                if not any(all(et in tags for et in [e]) for e in [expanded]):
+                    if not all(et in tags for et in expanded):
+                        continue
             if regions:
                 svc_regions = svc.get("regions") or []
                 if not all(r in svc_regions for r in regions):
