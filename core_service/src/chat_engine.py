@@ -156,6 +156,11 @@ async def chat_pipeline(
                     f"[ENGINE] WARNING: annotation id={ann.get('id')} not found in results"
                 )
                 continue
+            if not ann.get("approved", True):
+                print(
+                    f"[ENGINE] service_id={ann.get('id')} rejected by LLM (approved=false)"
+                )
+                continue
             result_item = _to_service_result(svc, annotations)
             yield _sse("search_result", result_item)
             final_results.append(result_item)
