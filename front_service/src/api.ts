@@ -111,9 +111,9 @@ export function toFrontendServiceResult(r: BackendServiceResult): FrontendServic
     fz152: hasFz152(tags),
     region: mapRegions(r.regions || []),
     rationale: r.rationale,
-    priceScore: scoreFromDict(r.scores, "Стоимость", "Цена", "Price"),
-    taskMatchScore: scoreFromDict(r.scores, "Соответствие задаче", "Task Match"),
-    criteriaMatchScore: scoreFromDict(r.scores, "Соответствие критериям", "Criteria Match", "Соответствие"),
+    priceScore: scoreFromDict(r.scores, "Стоимость"),
+    taskMatchScore: scoreFromDict(r.scores, "Соответствие задаче"),
+    criteriaMatchScore: scoreFromDict(r.scores, "Дополнительные пожелания"),
     pricing_elements: r.pricing_elements,
   };
 }

@@ -131,7 +131,7 @@ function ResultCardFull({ result, rank }: { result: ServiceResult; rank: number 
           <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Скоринг</div>
           <ScoreBar label="Цена" value={result.priceScore} />
           <ScoreBar label="Соответствие задаче" value={result.taskMatchScore} />
-          <ScoreBar label="Соответствие критериям" value={result.criteriaMatchScore} />
+          <ScoreBar label="Доп. пожелания" value={result.criteriaMatchScore} />
         </div>
         {result.pricing_elements && result.pricing_elements.length > 0 && (
           <div className="bg-muted/50 rounded-lg p-3 border">
