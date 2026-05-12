@@ -283,13 +283,12 @@ export default function App() {
           botTextRef.current += tokenText;
           setStreamingText(botTextRef.current);
         },
-        onDone: () => {
-          setIsLoading(false);
-          setStreamingText("");
-          const assistMsg = { role: "assistant" as const, text: botTextRef.current };
-          const allMsgs = [...captureMessages, userMsg, assistMsg];
-          setMessages(allMsgs);
-          if (pendingResults.length > 0) {
+          onDone: () => {
+            setIsLoading(false);
+            setStreamingText("");
+            const assistMsg = { role: "assistant" as const, text: botTextRef.current };
+            const allMsgs = [...captureMessages, userMsg, assistMsg];
+            setMessages(allMsgs);
             const newEntry: HistoryEntry = {
               query: text,
               results: pendingResults,
@@ -297,9 +296,8 @@ export default function App() {
             };
             setResultsHistory((prev) => [newEntry, ...prev]);
             setSelectedResultIdx(0);
-          }
-          setPhase("results");
-        },
+            setPhase("results");
+          },
         onError: (errText) => {
           setIsLoading(false);
           setStreamingText("");
@@ -333,6 +331,7 @@ export default function App() {
     if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
     resetSessionId();
     setMessages([]);
+    setResultsHistory([]);
     setIsLoading(false);
     setStreamingText("");
     setIsNewSearch(true);
@@ -621,7 +620,7 @@ export default function App() {
       <div ref={splitContainerRef} className="sm:hidden flex-1 flex flex-col overflow-hidden select-none">
         {/* Top: scrollable results */}
         <div className="overflow-y-auto min-h-0" style={{ flex: splitRatio }}>
-          {currentSet && (
+          {currentSet && currentSet.results.length > 0 && (
             <div className="p-3">
               <div className="grid grid-cols-1 gap-2">
                 {currentSet.results.map((res, idx) => (
@@ -630,6 +629,15 @@ export default function App() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+          {currentSet && currentSet.results.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-full text-center p-8">
+              <Search className="w-12 h-12 text-muted-foreground/40 mb-4" />
+              <h3 className="text-base font-semibold mb-2">Ничего не нашлось</h3>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Попробуйте изменить запрос или снять часть фильтров
+              </p>
             </div>
           )}
         </div>
@@ -724,7 +732,7 @@ export default function App() {
           </>
         )}
         <div className="flex-1 overflow-y-auto">
-          {currentSet && (
+          {currentSet && currentSet.results.length > 0 && (
             <div className="max-w-6xl mx-auto p-5">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-1 h-5 rounded-full bg-gradient-to-b from-[#1DAFF7] to-[#008ACD]" />
@@ -740,6 +748,15 @@ export default function App() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+          {currentSet && currentSet.results.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-full text-center p-8">
+              <Search className="w-16 h-16 text-muted-foreground/40 mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Ничего не нашлось</h3>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Попробуйте изменить запрос или снять часть фильтров
+              </p>
             </div>
           )}
         </div>
